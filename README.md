@@ -121,6 +121,13 @@ Acknowledgments
 Thrift was inspired by pillar, a lightweight RPC tool written by Adam D'Angelo,
 and also by Google's protocol buffers.
 
+Installation (macOS)
+====================
+
+Run the script:
+
+    ./build-mac
+
 Installation
 ============
 
