@@ -1301,6 +1301,25 @@ void t_go_generator::generate_go_struct_initializer(ostream& out,
   out << "}" << endl;
 }
 
+// Convert lowerCamelCase and UpperCamelCase strings to lower_with_underscore.
+string to_snake_case(string &&camelCase) {
+  string str(1, tolower(camelCase[0]));
+
+  // First place underscores between contiguous lower and upper case letters.
+  // For example, `_LowerCamelCase` becomes `_Lower_Camel_Case`.
+  for (auto it = camelCase.begin() + 1; it != camelCase.end(); ++it) {
+    if (isupper(*it) && *(it-1) != '_' && islower(*(it-1))) {
+      str += "_";
+    }
+    str += *it;
+  }
+
+  // Then convert it to lower case.
+  transform(str.begin(), str.end(), str.begin(), ::tolower);
+
+  return str;
+}
+
 /**
  * Generates a struct definition for a thrift data type.
  *
@@ -1367,21 +1386,37 @@ void t_go_generator::generate_go_struct_definition(ostream& out,
 
       t_type* fieldType = (*m_iter)->get_type();
       string goType = type_to_go_type_with_opt(fieldType, is_pointer_field(*m_iter));
-      string gotag = "db:\"" + escape_string((*m_iter)->get_name())  + "\" ";
+      string gotag = "pg:\"";
+      // Check for custom pg tag using "go.pgtag"
+      bool is_optional = (*m_iter)->get_req() == t_field::T_OPTIONAL;
+      std::map<string, string>::iterator it = (*m_iter)->annotations_.find("go.pgtag");
+      if (it != (*m_iter)->annotations_.end()) {
+        gotag += it->second;
+      } else {
+        gotag += to_snake_case(escape_string((*m_iter)->get_name()));
+        if (!is_optional) {
+          gotag += ",notnull";
+        }
+      }
+      gotag += "\" ";
 
       // Only add the `omitempty` tag if this field is optional and has no default value.
       // Otherwise a proper value like `false` for a bool field will be ommitted from
       // the JSON output since Go Marshal won't output `zero values`.
       bool has_default = (*m_iter)->get_value();
-      bool is_optional = (*m_iter)->get_req() == t_field::T_OPTIONAL;
       if (is_optional && !has_default) {
-        gotag += "json:\"" + escape_string((*m_iter)->get_name()) + ",omitempty\"";
+        gotag += "json:\"" + to_snake_case(escape_string((*m_iter)->get_name())) + ",omitempty\"";
       } else {
-        gotag += "json:\"" + escape_string((*m_iter)->get_name()) + "\"";
+        gotag += "json:\"" + to_snake_case(escape_string((*m_iter)->get_name())) + "\"";
       }
 
-      // Check for user override of db and json tags using "go.tag"
-      std::map<string, string>::iterator it = (*m_iter)->annotations_.find("go.tag");
+      // Check for extra tags using "go.extratag"
+      it = (*m_iter)->annotations_.find("go.extratag");
+      if (it != (*m_iter)->annotations_.end()) {
+        gotag += " " + it->second;
+      }
+      // Check for user override of pg and json tags using "go.tag"
+      it = (*m_iter)->annotations_.find("go.tag");
       if (it != (*m_iter)->annotations_.end()) {
         gotag = it->second;
       }
