@@ -897,15 +897,12 @@ string t_go_generator::go_package() {
  * If consts include the additional imports.
  */
 string t_go_generator::go_imports_begin(bool consts) {
+  // May need special handling of enums later
+  std::ignore = consts;
   std::vector<string> system_packages;
   system_packages.push_back("bytes");
   system_packages.push_back("context");
   system_packages.push_back("reflect");
-  // If not writing constants, and there are enums, need extra imports.
-  if (!consts && get_program()->get_enums().size() > 0) {
-    system_packages.push_back("database/sql/driver");
-    system_packages.push_back("errors");
-  }
   system_packages.push_back("fmt");
   system_packages.push_back(gen_thrift_import_);
   return "import(\n" + render_system_packages(system_packages);
@@ -1036,25 +1033,6 @@ void t_go_generator::generate_enum(t_enum* tenum) {
   f_types_ << "*p = q" << endl;
   f_types_ << "return nil" << endl;
   f_types_ << "}" << endl << endl;
-
-  // Generate Scan for sql.Scanner interface
-  f_types_ << "func (p *" << tenum_name << ") Scan(value interface{}) error {" <<endl;
-  f_types_ << "v, ok := value.(int64)" <<endl;
-  f_types_ << "if !ok {" <<endl;
-  f_types_ << "return errors.New(\"Scan value is not int64\")" <<endl;
-  f_types_ << "}" <<endl;
-  f_types_ << "*p = " << tenum_name << "(v)" << endl;
-  f_types_ << "return nil" << endl;
-  f_types_ << "}" << endl << endl;
-
-  // Generate Value for driver.Valuer interface
-  f_types_ << "func (p * " << tenum_name << ") Value() (driver.Value, error) {" <<endl;
-  f_types_ << "  if p == nil {" << endl;
-  f_types_ << "    return nil, nil" << endl;
-  f_types_ << "  }" << endl;
-  f_types_ << "return int64(*p), nil" << endl;
-  f_types_ << "}" << endl;
-
 }
 
 /**
